@@ -1,0 +1,25 @@
+# Simulator bridge (headless motorlib only - no PyQt/GUI deps needed)
+numpy
+scipy
+scikit-fmm
+scikit-image
+cython
+
+# Agent orchestration
+langgraph
+langchain
+fastapi
+uvicorn
+
+# Surrogate model (Phase 2/3)
+scikit-learn
+# torch          # uncomment if going MLP route beyond sklearn
+
+# RAG / diagnostic agent
+chromadb
+sentence-transformers
+
+# Utilities
+pydantic
+python-dotenv
+pytest
