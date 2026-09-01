@@ -47,6 +47,20 @@ DEFAULT_PROPELLANT = {
     ]
 }
 
+# The GUI's actual default alert thresholds, taken from openMotor's
+# uilib/defaults.py (DEFAULT_PREFERENCES['general']). motorlib.Motor.config
+# properties default their `.value` to their *minimum* allowed value (0 for
+# all three of these), NOT to any sensible real-world default - so leaving
+# config unset makes every non-zero simulation trip all three alerts. This
+# bit us on the first two sweep runs (every single row had all 4 alerts).
+DEFAULT_MOTOR_CONFIG = {
+    'maxPressure': 1500 * 6895,     # 1500 psi -> Pa
+    'maxMassFlux': 2 / 0.001422,    # matches GUI's internal unit conversion
+    'maxMachNumber': 0.7,
+    'minPortThroat': 2,
+    'flowSeparationWarnPercent': 0.05,
+}
+
 
 def run_bates_sim(params: BatesParams, propellant_props: dict = None,
                    nozzle_efficiency: float = 0.9, div_angle: float = 15,
@@ -74,6 +88,10 @@ def run_bates_sim(params: BatesParams, propellant_props: dict = None,
 
     motor.propellant = motorlib.propellant.Propellant()
     motor.propellant.setProperties(propellant_props or DEFAULT_PROPELLANT)
+
+    # Without this, config thresholds default to 0 (their FloatProperty
+    # minimum) and every simulation trips every alert regardless of geometry.
+    motor.config.setProperties(DEFAULT_MOTOR_CONFIG)
 
     result = motor.runSimulation()
     channels = result.channels

@@ -1,0 +1,9 @@
+﻿.venv/
+__pycache__/
+*.pyc
+motorlib/
+mathlib/
+*.so
+build/
+data/raw/*.csv
+.DS_Store
