@@ -5,6 +5,9 @@ scikit-fmm
 scikit-image
 cython
 
+#design agent
+matplotlib
+
 # Agent orchestration
 langgraph
 langchain

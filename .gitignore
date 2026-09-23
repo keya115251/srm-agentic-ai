@@ -6,4 +6,7 @@ mathlib/
 *.so
 build/
 data/raw/*.csv
+data/raw/plots/
+outputs/
+*.png
 .DS_Store
