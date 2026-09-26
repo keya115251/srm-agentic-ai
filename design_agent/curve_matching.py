@@ -131,13 +131,21 @@ def print_report(out: dict):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--params-json', required=True,
+    parser.add_argument('--params-json',
                          help='JSON dict of candidate design params, e.g. '
                               '\'{"diameter":0.08,"length":0.17,"coreDiameter":0.05,'
-                              '"throat":0.014,"exit":0.079}\'')
+                              '"throat":0.014,"exit":0.079}\'. On Windows/PowerShell, '
+                              'quoting this inline is unreliable - use --params-file instead.')
+    parser.add_argument('--params-file',
+                         help='Path to a JSON file containing the params dict. '
+                              'Easier than --params-json on Windows/PowerShell, which '
+                              'often mangles nested quotes when calling external programs.')
     parser.add_argument('--target-csv', required=True,
                          help='CSV with columns: time, pressure (and/or thrust)')
     args = parser.parse_args()
+
+    if not args.params_json and not args.params_file:
+        parser.error('provide either --params-json or --params-file')
 
     import csv
     time_vals, pressure_vals, thrust_vals = [], [], []
@@ -152,7 +160,14 @@ def main():
             if has_thrust:
                 thrust_vals.append(float(row['thrust']))
 
-    params = json.loads(args.params_json)
+    if args.params_file:
+        # utf-8-sig tolerates a BOM (byte-order-mark) at the start of the file,
+        # which PowerShell's `-Encoding utf8` silently adds and which a plain
+        # 'utf-8' open() would choke on with "Expecting value: line 1 column 1".
+        with open(args.params_file, encoding='utf-8-sig') as f:
+            params = json.load(f)
+    else:
+        params = json.loads(args.params_json)
     target_time = np.array(time_vals)
     target_pressure = np.array(pressure_vals) if pressure_vals else None
     target_thrust = np.array(thrust_vals) if thrust_vals else None

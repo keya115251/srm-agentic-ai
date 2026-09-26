@@ -10,3 +10,5 @@ data/raw/plots/
 outputs/
 *.png
 .DS_Store
+design_params.json
+
