@@ -13,6 +13,8 @@ import motorlib.motor
 import motorlib.grains
 import motorlib.propellant
 
+from simulator_bridge.common import DEFAULT_PROPELLANT, DEFAULT_MOTOR_CONFIG
+
 
 class BatesParams(TypedDict):
     diameter: float        # grain OD, m
@@ -36,37 +38,24 @@ class SimSummary(TypedDict):
     kn: List[float]
 
 
-# KNSU propellant properties, sourced from the mech team's mini-project.
-# Swap this out via a `propellant_props` argument if testing other grains.
-DEFAULT_PROPELLANT = {
-    'name': 'KNSU',
-    'density': 1890,
-    'tabs': [
-        {'minPressure': 0, 'maxPressure': 7e7, 'a': 0.000101, 'n': 0.319,
-         't': 1720, 'm': 41.98, 'k': 1.133}
-    ]
-}
-
-# The GUI's actual default alert thresholds, taken from openMotor's
-# uilib/defaults.py (DEFAULT_PREFERENCES['general']). motorlib.Motor.config
-# properties default their `.value` to their *minimum* allowed value (0 for
-# all three of these), NOT to any sensible real-world default - so leaving
-# config unset makes every non-zero simulation trip all three alerts. This
-# bit us on the first two sweep runs (every single row had all 4 alerts).
-DEFAULT_MOTOR_CONFIG = {
-    'maxPressure': 1500 * 6895,     # 1500 psi -> Pa
-    'maxMassFlux': 2 / 0.001422,    # matches GUI's internal unit conversion
-    'maxMachNumber': 0.7,
-    'minPortThroat': 2,
-    'flowSeparationWarnPercent': 0.05,
-}
-
-
 def run_bates_sim(params: BatesParams, propellant_props: dict = None,
-                   nozzle_efficiency: float = 0.9, div_angle: float = 15,
-                   conv_angle: float = 45) -> SimSummary:
+                   nozzle_efficiency: float = 0.94, div_angle: float = 15,
+                   conv_angle: float = 30, throat_length: float = 0.0,
+                   erosion_coeff: float = 0.0, slag_coeff: float = 0.0) -> SimSummary:
     """Builds a single-BATES-grain motor from `params` and runs a full
-    headless simulation. Returns summary stats plus raw curves."""
+    headless simulation. Returns summary stats plus raw curves.
+
+    throat_length, erosion_coeff, and slag_coeff default to 0, which models
+    an idealized, perfectly rigid, non-eroding throat with zero length. This
+    matches motorlib's own FloatProperty minimums (i.e. what happens if you
+    never touch these fields in the GUI either), so it's a deliberate,
+    documented simplification rather than an unexamined default - not a
+    physically realistic throat. Pass real values here once available (e.g.
+    from the mech team's nozzle material/geometry) for a more accurate sim,
+    particularly for burn-time-integrated effects like throat erosion, which
+    Puskulcu & Ulas (2008) identified as a real source of sim-vs-test-fire
+    pressure deviation.
+    """
     motor = motorlib.motor.Motor()
 
     grain = motorlib.grains.BatesGrain()
@@ -84,6 +73,9 @@ def run_bates_sim(params: BatesParams, propellant_props: dict = None,
         'efficiency': nozzle_efficiency,
         'divAngle': div_angle,
         'convAngle': conv_angle,
+        'throatLength': throat_length,
+        'erosionCoeff': erosion_coeff,
+        'slagCoeff': slag_coeff,
     })
 
     motor.propellant = motorlib.propellant.Propellant()
@@ -118,7 +110,6 @@ def run_bates_sim(params: BatesParams, propellant_props: dict = None,
 
 if __name__ == '__main__':
     # Quick smoke test using the mech team's approximate G-class parameters.
-    # Replace with their exact logged values to cross-check against ~115.04 Ns.
     demo_params: BatesParams = {
         'diameter': 0.083058,
         'length': 0.1397,
@@ -132,3 +123,5 @@ if __name__ == '__main__':
     print(f"Total impulse: {summary['total_impulse']:.2f} Ns")
     print(f"Peak Pc: {summary['peak_pressure']:.0f} Pa")
     print(f"Alerts: {summary['alerts']}")
+
+    

@@ -25,7 +25,7 @@ DIAMETER_BOUNDS = (0.06, 0.10)
 LENGTH_BOUNDS = (0.10, 0.18)
 CORE_DIAMETER_FRAC_BOUNDS = (0.30, 0.75)
 THROAT_BOUNDS = (0.010, 0.018)
-EXIT_THROAT_RATIO_BOUNDS = (3.0, 9.0)
+EXIT_THROAT_RATIO_BOUNDS = (1.5, 3.5)
 
 
 def sample_candidates(n: int, rng: np.random.Generator) -> np.ndarray:
