@@ -17,12 +17,17 @@ Usage:
     python surrogate/review_surrogate.py --data data/raw/bates_sweep_random.csv
 """
 import argparse
+import os
+import sys
 
 import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold, cross_val_score
 from sklearn.neighbors import NearestNeighbors
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from surrogate.bates_features import PHYSICS_FEATURES
 
 FEATURES = ['diameter', 'length', 'coreDiameter', 'throat', 'exit']
 TARGETS = ['peak_thrust', 'total_impulse', 'peak_pressure', 'peak_kn']
@@ -38,12 +43,14 @@ def feature_importance_report(models: dict):
     print("\n=== Feature importance per target ===")
     print("(GradientBoostingRegressor's built-in importance - higher means")
     print(" that input drives more of the model's prediction for this output)\n")
-    header = f"{'':16}" + "".join(f"{f:>14}" for f in FEATURES)
-    print(header)
+    # Models trained with physics features are pipelines whose last step sees
+    # the raw inputs followed by the physics features.
     for target, model in models.items():
-        importances = model.feature_importances_
-        row = f"{target:16}" + "".join(f"{v:>14.3f}" for v in importances)
-        print(row)
+        is_pipeline = hasattr(model, 'steps')
+        reg = model[-1] if is_pipeline else model
+        names = FEATURES + PHYSICS_FEATURES if is_pipeline else FEATURES
+        top = sorted(zip(names, reg.feature_importances_), key=lambda x: -x[1])[:6]
+        print(f"{target:16}" + ', '.join(f"{n} {v:.3f}" for n, v in top))
     print("\nSanity check against physical intuition:")
     print("- throat should dominate peak_pressure and peak_kn (Kn = burn area / throat area)")
     print("- diameter/length should dominate total_impulse (bigger grain = more propellant)")
