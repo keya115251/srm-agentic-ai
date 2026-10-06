@@ -15,6 +15,7 @@ features such as initial Kn) before trusting the surrogate:
     in_range      True if every checked value is inside the training range
     out_of_range  {name: (value, (min, max))} for each value outside it
     source        'surrogate' or 'simulator'
+    alerts        (fallback only) the simulator's alert messages
 """
 import os
 from functools import lru_cache
@@ -57,6 +58,7 @@ def predict(params: dict, fallback: bool = False,
         from simulator_bridge.hybrid_motor import run_hybrid_sim
         summary = run_hybrid_sim(params)
         result.update({t: summary[t] for t in d['targets']})
+        result['alerts'] = summary['alerts']
         result['source'] = 'simulator'
         return result
 

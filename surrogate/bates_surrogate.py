@@ -14,6 +14,7 @@ features such as initial and peak Kn) before trusting the surrogate:
     in_range      True if every checked value is inside the training range
     out_of_range  {name: (value, (min, max))} for each value outside it
     source        'surrogate' or 'simulator'
+    alerts        (fallback only) the simulator's alert messages
 """
 import os
 from functools import lru_cache
@@ -56,6 +57,7 @@ def predict(params: dict, fallback: bool = False,
         from simulator_bridge.bates_motor import run_bates_sim
         summary = run_bates_sim(params)
         result.update({t: summary[t] for t in d['targets']})
+        result['alerts'] = summary['alerts']
         result['source'] = 'simulator'
         return result
 

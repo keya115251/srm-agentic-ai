@@ -57,6 +57,31 @@ test/                Unit tests
         tried first and found to silently fail, GBM surrogates produce a piecewise-constant
         prediction surface, so finite-difference gradients are usually exactly zero.
         Nelder-Mead (gradient-free) is the correct pairing for a tree-based surrogate.
+- [x] Four grain types, each with a simulator wrapper (`simulator_bridge/`), a data generator
+      (`scripts/generate_sweep_data_*.py`) and a surrogate with physics features and a
+      range-guarded `predict(params, fallback=True)` (`surrogate/*_surrogate.py`) that runs the
+      real simulator for designs outside the training ranges:
+      - BATES (`bates_motor.py`)
+      - Finocyl (`finocyl_motor.py`)
+      - BATES + Finocyl hybrid, Finocyl segment forward (`hybrid_motor.py`)
+      - Star (`star_motor.py`) - trained on 1,326 clean sims out of 2,000; R^2 0.997-0.998 on
+        400 separately generated sims (`train_star_surrogate.py --holdout`), matching its
+        test-split R^2, so no sign of overfitting.
+      The BATES surrogate is trained on all successful sims, alert-flagged ones included; the
+      other three drop flagged sims (except the tail-off flow-separation warning every
+      Finocyl/Star design trips).
+- [x] Multi-grain search (`design_agent/search_multigrain.py`) - runs the v3 DE + Nelder-Mead
+      search for all four grain types through each grain's range-guarded surrogate,
+      re-simulates each grain's pick for real and ranks the grains on the real results.
+      Fallback simulations whose real result raises an alert are penalized, otherwise the
+      exact fallback draws the optimizer into flagged designs. At 1300 Ns / 6 MPa: BATES
+      1298.5 Ns, Finocyl 1276.8 Ns, Star 1270.6 Ns in the real simulator; the Hybrid's pick
+      tripped the mass-flux limit and was flagged.
+- [x] Multi-grain K-class sweep (`design_agent/kclass_sweep_multigrain.py`) - the K-class sweep
+      for all four grain types against the real K950 curve (9 targets each). Best valid thrust
+      cosine similarity: BATES 0.9936, Hybrid 0.9923, Star 0.9918, Finocyl 0.9908 - a spread
+      smaller than the variation between neighbouring targets for one grain, so no grain type
+      is meaningfully better on this metric (see Known limitations).
 - [x] Curve-shape validation (`design_agent/curve_matching.py`) - cosine similarity +
       relative impulse error against a target pressure/thrust curve (Eqs. 35-36, Fan et al.
       2026). Requires the real simulator, since the surrogate only predicts scalar peaks,
@@ -86,6 +111,11 @@ test/                Unit tests
   sampled design space, which matters most near constraint boundaries (high pressure, tight
   port/throat ratios) where the optimizer tends to push designs. Oversampling those regions
   in future data generation is a noted improvement, not yet done.
+- Cosine similarity is scale-invariant, so it rewards a design whose thrust curve is the right
+  shape at the wrong level: every grain type's best K-class match to K950 runs ~200-250 N
+  above it and still scores ~0.99, and none reproduces K950's ignition spike and dip. The
+  searches also optimize impulse only, so curve shape is a by-product. Scoring designs on an
+  absolute curve error over a shortlist of real sims is a noted improvement, not yet done.
 
 ## Setup
 
