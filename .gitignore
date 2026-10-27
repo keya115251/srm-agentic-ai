@@ -6,6 +6,7 @@ mathlib/
 *.so
 build/
 data/raw/*.csv
+data/raw/*.jsonl
 data/raw/plots/
 outputs/
 *.png

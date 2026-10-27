@@ -119,7 +119,7 @@ def print_report(metrics: dict):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', default='data/raw/bates_sweep_random.csv')
+    parser.add_argument('--data', default='data/raw/bates_sweep_lhs.csv')
     parser.add_argument('--out', default='surrogate/surrogate_model.joblib')
     args = parser.parse_args()
 

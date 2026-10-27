@@ -115,7 +115,7 @@ def print_report(metrics: dict):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', default='data/raw/finocyl_sweep_random.csv')
+    parser.add_argument('--data', default='data/raw/finocyl_sweep_lhs.csv')
     parser.add_argument('--out', default='surrogate/finocyl_surrogate_model.joblib')
     parser.add_argument('--drop-separation', action='store_true')
     args = parser.parse_args()

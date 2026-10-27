@@ -109,7 +109,7 @@ def print_report(metrics: dict, feature_names: list):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', default='data/raw/hybrid_sweep_random.csv')
+    parser.add_argument('--data', default='data/raw/hybrid_sweep_lhs.csv')
     parser.add_argument('--out', default='surrogate/hybrid_surrogate_model.joblib')
     parser.add_argument('--raw-only', action='store_true',
                         help='train on the 10 raw inputs without physics features')

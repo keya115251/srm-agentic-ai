@@ -136,7 +136,7 @@ def holdout_report(models: dict, metrics: dict, path: str, drop_separation: bool
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--data', default='data/raw/star_sweep_random.csv')
+    parser.add_argument('--data', default='data/raw/star_sweep_lhs.csv')
     parser.add_argument('--out', default='surrogate/star_surrogate_model.joblib')
     parser.add_argument('--drop-separation', action='store_true')
     parser.add_argument('--holdout', default=None,
