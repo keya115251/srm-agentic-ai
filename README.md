@@ -90,11 +90,28 @@ test/                Unit tests
       for all four grain types against the real K950 curve (9 targets each). Best valid thrust
       cosine similarity: BATES 0.9936, Hybrid 0.9923, Star 0.9918, Finocyl 0.9908 - a spread
       smaller than the variation between neighbouring targets for one grain, so no grain type
-      is meaningfully better on this metric (see Known limitations).
+      is meaningfully better on this metric. Now ranked by the absolute thrust match error
+      below instead.
 - [x] Curve-shape validation (`design_agent/curve_matching.py`) - cosine similarity +
       relative impulse error against a target pressure/thrust curve (Eqs. 35-36, Fan et al.
       2026). Requires the real simulator, since the surrogate only predicts scalar peaks,
       not full curves.
+- [x] Absolute curve-match scoring (`curve_matching.thrust_match()`, tests in
+      `test/test_curve_matching.py`) - replaces cosine similarity for ranking. Error =
+      normalized RMSE of thrust over the burn (divided by the target's average thrust) +
+      0.5 x |impulse error| + 0.5 x |burn time error|; lower is better, 0 = identical. Weights
+      are fixed a priori, not fitted to any target. Cosine is still reported. On K950, 339
+      eligible library designs score cosine >= 0.99 while their impulse ranges from -86% to
+      +56% of the target; the top cosine pick is 68% short on impulse.
+- [x] Match any target curve (`design_agent/match_curve.py`) - screens all ~22,000 saved LHS
+      curves (four grains, training + holdout) against the target in seconds, excluding
+      alert-flagged, structurally failing or over-pressure designs, then refines the best
+      per grain with Nelder-Mead on the real simulator (40 sims each by default). Impulse,
+      burn time and level all come from the target curve, so nothing is target specific.
+      K950 at 6 MPa: Finocyl 0.099 (impulse +0.4%, burn time +3.6%), Hybrid 0.104, Star 0.114,
+      BATES 0.148. Also run on four synthetic non-K950 targets (regressive ~600 Ns,
+      boost-sustain ~1200 Ns, progressive ~1800 Ns, short neutral ~2500 Ns): best errors
+      0.09-0.27, with refinement improving every grain's library pick.
 - [x] Result plotting (`design_agent/plotting.py`) - single combined-axis chart (Kn,
       Pressure, Force) matching OpenMotor's own GUI plot style, plus a stats readout.
 - [x] Structural checks (`structural_tools/casing.py`, write-up in `docs/structural_checks.md`):
@@ -127,11 +144,12 @@ test/                Unit tests
   sampled design space, which matters most near constraint boundaries (high pressure, tight
   port/throat ratios) where the optimizer tends to push designs. Oversampling those regions
   in future data generation is a noted improvement, not yet done.
-- Cosine similarity is scale-invariant, so it rewards a design whose thrust curve is the right
-  shape at the wrong level: every grain type's best K-class match to K950 runs ~200-250 N
-  above it and still scores ~0.99, and none reproduces K950's ignition spike and dip. The
-  searches also optimize impulse only, so curve shape is a by-product. Scoring designs on an
-  absolute curve error over a shortlist of real sims is a noted improvement, not yet done.
+- Curve matching works on real simulated curves (library screen + real-sim refinement), not
+  the surrogates, which only predict scalars. Refinement is local and capped, so it improves
+  the best library design rather than searching globally; a whole-curve surrogate trained on
+  the `_curves.jsonl` sidecars would allow a global curve search. No design reproduces
+  K950's ignition spike and dip, and the simulator's propellant (KNSU) differs from K950's
+  (APCP), so a perfect match is not expected.
 
 ## Setup
 

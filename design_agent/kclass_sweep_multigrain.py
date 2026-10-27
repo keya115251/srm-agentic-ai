@@ -6,8 +6,10 @@ each target found by search_multigrain.py's per-grain search, so BATES,
 Finocyl, the BATES + Finocyl hybrid and Star are compared on curve shape.
 
 For every (grain, target) pair the chosen design is simulated for real and
-its thrust curve compared with the reference by cosine similarity, as in
-curve_matching.py. A design is eligible for "best match" only if its REAL
+its thrust curve compared with the reference by curve_matching.thrust_match(),
+which scores absolute thrust (normalized RMSE plus impulse and burn time
+error) rather than shape alone; cosine similarity is still printed for
+reference. A design is eligible for "best match" only if its REAL
 impulse is inside K-class and its real simulation raises no alert other than
 the tail-off flow-separation warning (see search_multigrain.py) and it
 passes the structural checks at its real peak pressure
@@ -33,20 +35,11 @@ import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import design_agent.search_multigrain as sm
-from design_agent.curve_matching import cosine_similarity, resample_to_grid
+from design_agent.curve_matching import describe_match, thrust_match
 from design_agent.kclass_sweep import K_CLASS_MIN, K_CLASS_MAX
 from structural_tools.casing import add_structural_args, case_spec_from_args
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='motorlib')
-
-
-def thrust_cosine(sim: dict, target_time, target_thrust, dt: float = 0.02) -> float:
-    """Thrust-curve cosine similarity on a shared uniform grid, as in
-    curve_matching.compare_curves() (which only runs BATES designs)."""
-    t_max = max(target_time[-1], sim['time'][-1])
-    grid = np.arange(0, t_max + dt, dt)
-    return float(cosine_similarity(resample_to_grid(sim['time'], sim['thrust'], grid),
-                                   resample_to_grid(target_time, target_thrust, grid)))
 
 
 def main():
@@ -98,12 +91,14 @@ def main():
                     print(f"FAILED - {e}")
                     continue
                 real = sim['total_impulse']
+                match = thrust_match(sim['time'], sim['thrust'], target_time, target_thrust)
                 row = {
                     'grain': name, 'target_impulse': float(target), 'params': r['params'],
                     'pred_impulse': r['pred']['total_impulse'], 'real_impulse': real,
                     'drift': abs(real - r['pred']['total_impulse']) / real,
                     'peak_pressure': sim['peak_pressure'],
-                    'cosine_similarity': thrust_cosine(sim, target_time, target_thrust),
+                    'match_error': match['match_error'], 'match': match,
+                    'cosine_similarity': match['cosine_similarity'],
                     'valid': K_CLASS_MIN <= real <= K_CLASS_MAX,
                     # search_grain() re-simulates the same params, so its
                     # structural verdict holds for `sim` too.
@@ -115,7 +110,7 @@ def main():
                 results.append(row)
                 status = ('FLAGGED' if row['flagged'] else
                           'OK' if row['valid'] else 'INVALID (outside K-class)')
-                print(f"cos_sim={row['cosine_similarity']:.4f}  real={real:.0f}Ns  "
+                print(f"match_error={row['match_error']:.4f}  real={real:.0f}Ns  "
                       f"drift={row['drift']:.1%}  {r['fallback_sims']} fallback sims, "
                       f"{time.time() - t0:.0f}s  {status}", flush=True)
     finally:
@@ -128,22 +123,23 @@ def main():
         return
 
     eligible = [r for r in results if r['valid'] and not r['flagged']]
-    print("\n=== Best eligible match per grain type (by thrust cosine similarity) ===")
+    print("\n=== Best eligible match per grain type (lowest thrust match error) ===")
     for name in args.grains:
         mine = [r for r in eligible if r['grain'] == name]
         n_all = sum(r['grain'] == name for r in results)
         if not mine:
             print(f"  {name:<8} no eligible design ({n_all} run)")
             continue
-        b = max(mine, key=lambda r: r['cosine_similarity'])
-        print(f"  {name:<8} cos_sim={b['cosine_similarity']:.4f}  target={b['target_impulse']:.0f}Ns  "
+        b = min(mine, key=lambda r: r['match_error'])
+        print(f"  {name:<8} match_error={b['match_error']:.4f}  "
+              f"cos_sim={b['cosine_similarity']:.4f}  target={b['target_impulse']:.0f}Ns  "
               f"real={b['real_impulse']:.0f}Ns  peak_pressure={b['peak_pressure'] / 1e6:.2f}MPa  "
               f"({len(mine)}/{n_all} eligible)")
 
     if eligible:
-        best = max(eligible, key=lambda r: r['cosine_similarity'])
+        best = min(eligible, key=lambda r: r['match_error'])
         print(f"\n=== Best overall: {best['grain']} ===")
-        print(f"Cosine similarity vs reference: {best['cosine_similarity']:.4f}")
+        print(f"Vs reference: {describe_match(best['match'])}")
         print(f"Target {best['target_impulse']:.0f}Ns, real {best['real_impulse']:.0f}Ns "
               f"(drift {best['drift']:.1%}), alerts: {best['alerts'] or 'none'}")
         print(f"Params: {sm.fmt_params(best['params'])}")

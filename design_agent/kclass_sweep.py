@@ -3,8 +3,9 @@ Sweeps the hybrid optimizer (DE + Nelder-Mead) across several target-impulse
 values spanning the K-class range (1280.01-2560.00 Ns), rather than
 optimizing for a single midpoint value. For each target, validates the
 resulting design against a reference curve (e.g. the real K950) using
-curve_matching.py's cosine similarity, and reports which impulse target
-produces the best shape match.
+curve_matching.thrust_match() (absolute thrust: normalized RMSE plus impulse
+and burn time error), and reports which impulse target produces the best
+match.
 
 Why this can find a better match than a single midpoint run: the surrogate
 optimizes for impulse only, so different impulse targets land on genuinely
@@ -46,7 +47,7 @@ from scipy.optimize import differential_evolution, minimize
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from design_agent.curve_matching import compare_curves
+from design_agent.curve_matching import compare_curves, describe_match
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='motorlib')
 
@@ -160,6 +161,8 @@ def main():
         row = {
             'target_impulse': target_impulse,
             'params': params,
+            'match_error': match['thrust_match']['match_error'],
+            'match': match['thrust_match'],
             'cosine_similarity': match['thrust_cosine_similarity'],
             'impulse_error_vs_ref_pct': match['thrust_relative_impulse_error_pct'],
             'pred_impulse': pred_impulse,
@@ -169,7 +172,7 @@ def main():
             'alerts': sim['alerts'],
         }
         results.append(row)
-        print(f"cosine_sim={row['cosine_similarity']:.4f}  "
+        print(f"match_error={row['match_error']:.4f}  cosine_sim={row['cosine_similarity']:.4f}  "
               f"real={real_impulse:.0f}Ns  drift={drift:.1%}  "
               f"{'OK' if valid else 'INVALID (outside K-class)'}")
 
@@ -180,11 +183,11 @@ def main():
     valid_results = [r for r in results if r['valid']]
     invalid_results = [r for r in results if not r['valid']]
 
-    print(f"\n=== Full ranking (by cosine similarity) ===")
-    print(f"  {'target':>7} {'real':>7} {'drift':>7} {'cos_sim':>8} {'status':>8}")
-    for r in sorted(results, key=lambda r: -r['cosine_similarity']):
+    print(f"\n=== Full ranking (by thrust match error, lower is better) ===")
+    print(f"  {'target':>7} {'real':>7} {'drift':>7} {'error':>7} {'cos_sim':>8} {'status':>8}")
+    for r in sorted(results, key=lambda r: r['match_error']):
         print(f"  {r['target_impulse']:>7.0f} {r['real_impulse']:>7.0f} "
-              f"{r['drift']:>7.1%} {r['cosine_similarity']:>8.4f} "
+              f"{r['drift']:>7.1%} {r['match_error']:>7.4f} {r['cosine_similarity']:>8.4f} "
               f"{'OK' if r['valid'] else 'INVALID':>8}")
 
     if invalid_results:
@@ -196,15 +199,13 @@ def main():
         print("\nNo valid K-class designs found.")
         return
 
-    best = max(valid_results, key=lambda r: r['cosine_similarity'])
+    best = min(valid_results, key=lambda r: r['match_error'])
     drifts = [r['drift'] for r in results]
     print(f"\n=== Best valid K-class match ===")
     print(f"Target impulse: {best['target_impulse']:.0f} Ns "
           f"(surrogate: {best['pred_impulse']:.0f} Ns, real: {best['real_impulse']:.0f} Ns, "
           f"drift {best['drift']:.1%})")
-    print(f"Cosine similarity vs reference: {best['cosine_similarity']:.4f}")
-    print(f"Impulse error vs reference: {best['impulse_error_vs_ref_pct']:.2f}% "
-          f"(informational only; KNSB vs APCP means absolute impulse is not a target)")
+    print(f"Vs reference: {describe_match(best['match'])}")
     print(f"Alerts: {best['alerts'] or 'none'}")
     print(f"Params: {best['params']}")
     print(f"\nSurrogate drift across sweep: mean {np.mean(drifts):.1%}, "
