@@ -70,6 +70,15 @@ test/                Unit tests
       The BATES surrogate is trained on all successful sims, alert-flagged ones included; the
       other three drop flagged sims (except the tail-off flow-separation warning every
       Finocyl/Star design trips).
+- [x] Latin hypercube training data (`scripts/generate_sweep_data_lhs.py`) - 5,000 LHS samples
+      per grain type (plus a separate 500-sample holdout), with every sim's full
+      thrust/pressure/Kn curve kept in a `_curves.jsonl` sidecar for future whole-curve
+      surrogates. All four surrogates are retrained on it. On the shared 500-sample holdout
+      (`surrogate/compare_surrogates.py`), mean impulse error vs the previous random-sample
+      models: BATES 2.21% -> 0.95% (500 -> 5,000 sims), Finocyl 1.95% -> 1.21%, Hybrid
+      1.38% -> 0.89%, Star 1.47% -> 0.95%; every target improves for every grain, and the
+      p95 errors drop by 35-65%. Part of the gain is the larger sample count, not only the
+      sampling method.
 - [x] Multi-grain search (`design_agent/search_multigrain.py`) - runs the v3 DE + Nelder-Mead
       search for all four grain types through each grain's range-guarded surrogate,
       re-simulates each grain's pick for real and ranks the grains on the real results.
@@ -88,8 +97,15 @@ test/                Unit tests
       not full curves.
 - [x] Result plotting (`design_agent/plotting.py`) - single combined-axis chart (Kn,
       Pressure, Force) matching OpenMotor's own GUI plot style, plus a stats readout.
-- [ ] Structural checks (`structural_tools/`) - hoop stress and bulkhead bending equations
-      identified and sent to the mech team for verification; not yet implemented in code.
+- [x] Structural checks (`structural_tools/casing.py`, write-up in `docs/structural_checks.md`):
+      Lame thick-wall case stress (von Mises, closed ends), Barlow burst, flat-plate
+      bulkhead bending and radial-bolt closure retention (shear, bearing, tear-out, net
+      tension) at the design's peak pressure. Verified against force equilibrium, the
+      thin-wall limit, Roark's plate coefficients and a hand-worked example
+      (`test/test_structural.py`). Wired into the multi-grain search (penalty during search,
+      FLAGGED pick if the real sim fails) and the K-class sweep, and recorded as columns in
+      the LHS sweeps. Case hardware defaults are placeholders until the mech team supplies
+      theirs.
 - [ ] Cross-check against mech team's exact G109/G104 parameters - still needed to confirm
       the wrapper's outputs match their known OpenMotor GUI results (~115.04 Ns / ~110.01 Ns).
 

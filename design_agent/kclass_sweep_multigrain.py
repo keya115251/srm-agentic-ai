@@ -9,7 +9,9 @@ For every (grain, target) pair the chosen design is simulated for real and
 its thrust curve compared with the reference by cosine similarity, as in
 curve_matching.py. A design is eligible for "best match" only if its REAL
 impulse is inside K-class and its real simulation raises no alert other than
-the tail-off flow-separation warning (see search_multigrain.py).
+the tail-off flow-separation warning (see search_multigrain.py) and it
+passes the structural checks at its real peak pressure
+(structural_tools/casing.py; same --case-wall-mm etc. options).
 
 Usage:
     python design_agent/kclass_sweep_multigrain.py --target-csv data/k950_target_curve.csv
@@ -33,6 +35,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import design_agent.search_multigrain as sm
 from design_agent.curve_matching import cosine_similarity, resample_to_grid
 from design_agent.kclass_sweep import K_CLASS_MIN, K_CLASS_MAX
+from structural_tools.casing import add_structural_args, case_spec_from_args
 
 warnings.filterwarnings('ignore', category=RuntimeWarning, module='motorlib')
 
@@ -60,7 +63,9 @@ def main():
     parser.add_argument('--workers', type=int, default=max(1, (os.cpu_count() or 2) - 2))
     parser.add_argument('--save-json', default=None,
                         help='write every (grain, target) result, with curves, here')
+    add_structural_args(parser)
     args = parser.parse_args()
+    case_spec = case_spec_from_args(args)
 
     with open(args.target_csv) as f:
         rows = list(csv.DictReader(f))
@@ -85,7 +90,7 @@ def main():
                 search_args = SimpleNamespace(
                     target_impulse=target, max_pressure=args.max_pressure,
                     max_thrust=None, popsize=args.popsize, maxiter=args.maxiter,
-                    seed=args.seed)
+                    seed=args.seed, case_spec=case_spec)
                 try:
                     r = sm.search_grain(name, search_args, pool)
                     sim = sm.GRAINS[name].simulate(r['params'])
@@ -100,7 +105,10 @@ def main():
                     'peak_pressure': sim['peak_pressure'],
                     'cosine_similarity': thrust_cosine(sim, target_time, target_thrust),
                     'valid': K_CLASS_MIN <= real <= K_CLASS_MAX,
-                    'flagged': sm.is_flagged(sim['alerts']), 'alerts': sim['alerts'],
+                    # search_grain() re-simulates the same params, so its
+                    # structural verdict holds for `sim` too.
+                    'flagged': r['flagged'], 'alerts': sim['alerts'],
+                    'structural_failed': (r['structural'] or {}).get('failed', []),
                     'fallback_sims': r['fallback_sims'],
                     'curve': {k: sim[k] for k in ('time', 'thrust', 'pressure', 'kn')},
                 }

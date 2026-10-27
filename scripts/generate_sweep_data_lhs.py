@@ -38,12 +38,23 @@ from scipy.stats import qmc
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from design_agent.search_multigrain import GRAINS
+from structural_tools.casing import check_structure
 
 RAW_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                        'data', 'raw')
 GRAIN_NAMES = {name.lower(): name for name in GRAINS}
 OUTPUTS = ['success', 'burn_time', 'peak_thrust', 'total_impulse',
-           'peak_pressure', 'peak_kn', 'n_alerts', 'alerts', 'error']
+           'peak_pressure', 'peak_kn', 'n_alerts', 'alerts', 'error',
+           'struct_ok', 'struct_min_margin', 'struct_failed']
+
+
+def structural_columns(params: dict, peak_pressure: float) -> dict:
+    """Structural verdict for the default case hardware (see
+    structural_tools/casing.py). Recorded as a flag, not used to drop rows:
+    the surrogates model ballistics, which don't depend on the case."""
+    st = check_structure(params, peak_pressure)
+    return {'struct_ok': st['ok'], 'struct_min_margin': round(st['min_margin'], 4),
+            'struct_failed': '; '.join(st['failed'])}
 
 
 def lhs_params(grain_name: str, n: int, seed: int) -> list:
@@ -68,6 +79,7 @@ def run_one(job):
             'peak_thrust': s['peak_thrust'], 'total_impulse': s['total_impulse'],
             'peak_pressure': s['peak_pressure'], 'peak_kn': s['peak_kn'],
             'n_alerts': len(s['alerts']), 'alerts': '; '.join(s['alerts']), 'error': '',
+            **structural_columns(params, s['peak_pressure']),
         })
         curve = {'sample_id': sample_id,
                  **{k: [round(v, 6) for v in s[k]]
